@@ -3,53 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Система блокировки</title>
+    <title>Блокировка системы</title>
     <style>
+        /* Глобальный сброс */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* запрет прокрутки */
             background: #0a0a0a;
             font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            user-select: none;
             color: #fff;
+            touch-action: none; /* отключаем жесты */
+            user-select: none;
+            -webkit-user-select: none;
         }
+
+        /* Оверлей – максимальный z-index, перекрывает всё */
         #lockOverlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0,0,0,0.95);
-            z-index: 99999;
+            background: rgba(0, 0, 0, 0.98);
+            z-index: 2147483647; /* максимальный возможный */
             display: flex;
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            pointer-events: auto;
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            pointer-events: auto; /* перехватываем все события */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: none;
+            /* запрет выделения */
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #lockOverlay.hidden {
             display: none;
-            pointer-events: none;
         }
+
         .lock-box {
             background: #1a1a1a;
             padding: 40px 30px;
-            border-radius: 20px;
-            box-shadow: 0 0 50px rgba(255,0,0,0.6);
+            border-radius: 24px;
+            box-shadow: 0 0 60px rgba(255, 0, 0, 0.7);
             text-align: center;
             max-width: 420px;
             width: 90%;
             border: 2px solid #cc0000;
+            pointer-events: auto; /* внутри можно взаимодействовать */
         }
+
         .lock-icon {
             font-size: 80px;
             color: #cc0000;
-            text-shadow: 0 0 30px rgba(255,0,0,0.8);
+            text-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
             display: block;
             animation: pulse 1.5s infinite;
         }
@@ -58,10 +69,12 @@
             50% { transform: scale(1.08); }
             100% { transform: scale(1); }
         }
+
         .lock-box h1 {
             color: #ff4444;
             font-size: 24px;
             margin: 10px 0 5px;
+            letter-spacing: 1px;
         }
         .lock-box .sub {
             color: #aaa;
@@ -79,17 +92,19 @@
             background: #2a2a2a;
             border: 1px solid #444;
             padding: 14px 18px;
-            border-radius: 10px;
+            border-radius: 12px;
             color: #fff;
-            font-size: 18px;
+            font-size: 20px;
             text-align: center;
-            letter-spacing: 4px;
+            letter-spacing: 6px;
             outline: none;
             transition: border 0.2s;
+            pointer-events: auto;
+            font-weight: 600;
         }
         .input-group input:focus {
             border-color: #cc0000;
-            box-shadow: 0 0 15px rgba(204,0,0,0.3);
+            box-shadow: 0 0 20px rgba(204, 0, 0, 0.4);
         }
         .input-group input:disabled {
             opacity: 0.4;
@@ -99,13 +114,14 @@
             background: #cc0000;
             border: none;
             padding: 14px;
-            border-radius: 10px;
+            border-radius: 12px;
             color: #fff;
             font-size: 20px;
             font-weight: 700;
             cursor: pointer;
             transition: background 0.2s, transform 0.1s;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            pointer-events: auto;
         }
         .btn:hover:not(:disabled) { background: #ff1a1a; }
         .btn:active:not(:disabled) { transform: scale(0.96); }
@@ -113,6 +129,7 @@
             opacity: 0.4;
             cursor: not-allowed;
         }
+
         .error-msg {
             color: #ff6666;
             font-size: 14px;
@@ -134,45 +151,66 @@
         }
         .block-timer {
             color: #ffaa00;
-            font-size: 22px;
+            font-size: 24px;
             font-weight: bold;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            margin: 5px 0 10px;
         }
+
         .shake {
             animation: shake 0.4s ease-in-out;
         }
         @keyframes shake {
             0%,100% { transform: translateX(0); }
-            25% { transform: translateX(-10px); }
-            75% { transform: translateX(10px); }
+            25% { transform: translateX(-12px); }
+            75% { transform: translateX(12px); }
         }
-        body.alert-bg {
-            background: #660000 !important;
-            animation: flashBg 0.5s infinite alternate;
+
+        /* Мигающий фон при тревоге */
+        body.alert-bg #lockOverlay {
+            background: rgba(100, 0, 0, 0.95) !important;
+            animation: flashBg 0.4s infinite alternate;
         }
         @keyframes flashBg {
-            0% { background: #660000; }
-            100% { background: #cc0000; }
+            0% { background: rgba(100, 0, 0, 0.95); }
+            100% { background: rgba(200, 0, 0, 0.95); }
         }
+
+        /* Сообщение об успешной разблокировке */
         #unlockedContent {
             display: none;
-            padding: 20px;
+            padding: 30px;
             background: #0d0d0d;
-            border-radius: 12px;
-            border: 1px solid #00cc44;
+            border-radius: 16px;
+            border: 2px solid #00cc44;
             color: #0f0;
             text-align: center;
             max-width: 500px;
             width: 90%;
+            z-index: 1;
         }
-        #unlockedContent.visible { display: block; }
-        #unlockedContent h2 { color: #00ff66; font-size: 24px; }
-        #unlockedContent p { color: #aaa; }
+        #unlockedContent.visible {
+            display: block;
+        }
+        #unlockedContent h2 {
+            color: #00ff66;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        #unlockedContent p {
+            color: #aaa;
+            font-size: 16px;
+        }
+
+        /* Полностью скрываем всё, что может быть видно за оверлеем */
+        body > *:not(#lockOverlay):not(#unlockedContent) {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Оверлей блокировки -->
+    <!-- Оверлей блокировки (всегда в DOM) -->
     <div id="lockOverlay">
         <div class="lock-box" id="lockBox">
             <div id="lockContent"></div>
@@ -183,6 +221,7 @@
     <div id="unlockedContent">
         <h2>✅ ДОСТУП РАЗРЕШЁН</h2>
         <p>Система разблокирована. Все функции доступны.</p>
+        <p style="margin-top:15px;font-size:12px;color:#666;">Нажмите Esc для выхода из полноэкранного режима (если нужно).</p>
     </div>
 
     <script>
@@ -190,9 +229,9 @@
             "use strict";
 
             // ============================================================
-            // 1. ЕДИНЫЙ ПАРОЛЬ (ИЗМЕНИТЕ НА СВОЙ, 8 СИМВОЛОВ)
+            // 1. ЕДИНЫЙ ПАРОЛЬ (8 СИМВОЛОВ) — ИЗМЕНИТЕ НА СВОЙ
             // ============================================================
-            const FIXED_PASSWORD = "MySecret"; // Замените на нужный 8-символьный пароль
+            const FIXED_PASSWORD = "MySecret"; // например, "MySecret" — 8 символов
 
             // ============================================================
             // 2. КОНФИГУРАЦИЯ
@@ -202,10 +241,10 @@
             const BLOCK_MS = BLOCK_MINUTES * 60 * 1000;
 
             // ============================================================
-            // 3. РАБОТА С СОСТОЯНИЕМ (localStorage)
+            // 3. СОСТОЯНИЕ (localStorage)
             // ============================================================
             function getState() {
-                const raw = localStorage.getItem('lockState');
+                const raw = localStorage.getItem('lockState_fixed');
                 if (raw) {
                     try { return JSON.parse(raw); } catch(e) {}
                 }
@@ -213,21 +252,68 @@
             }
 
             function saveState(state) {
-                localStorage.setItem('lockState', JSON.stringify(state));
+                localStorage.setItem('lockState_fixed', JSON.stringify(state));
             }
 
             // ============================================================
-            // 4. ОСНОВНАЯ ЛОГИКА
+            // 4. DOM-ЭЛЕМЕНТЫ
             // ============================================================
+            const overlay = document.getElementById('lockOverlay');
+            const lockContent = document.getElementById('lockContent');
+            const unlockedDiv = document.getElementById('unlockedContent');
+            const lockBox = document.getElementById('lockBox');
+
             let state = getState();
             let unlocked = state.unlocked;
             let countdownInterval = null;
             let guardianInterval = null;
 
-            const overlay = document.getElementById('lockOverlay');
-            const lockContent = document.getElementById('lockContent');
-            const unlockedDiv = document.getElementById('unlockedContent');
+            // ============================================================
+            // 5. FULLSCREEN — принудительный режим
+            // ============================================================
+            function requestFullscreen() {
+                const el = document.documentElement;
+                if (el.requestFullscreen) {
+                    el.requestFullscreen().catch(() => {});
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                } else if (el.msRequestFullscreen) {
+                    el.msRequestFullscreen();
+                }
+            }
 
+            // При попытке выйти из fullscreen — возвращаем
+            document.addEventListener('fullscreenchange', function() {
+                if (!document.fullscreenElement && !unlocked) {
+                    requestFullscreen();
+                }
+            });
+            document.addEventListener('webkitfullscreenchange', function() {
+                if (!document.webkitFullscreenElement && !unlocked) {
+                    requestFullscreen();
+                }
+            });
+            document.addEventListener('mozfullscreenchange', function() {
+                if (!document.mozFullScreenElement && !unlocked) {
+                    requestFullscreen();
+                }
+            });
+            document.addEventListener('MSFullscreenChange', function() {
+                if (!document.msFullscreenElement && !unlocked) {
+                    requestFullscreen();
+                }
+            });
+
+            // Также запрашиваем fullscreen при загрузке и после любых кликов
+            document.addEventListener('click', function() {
+                if (!unlocked && !document.fullscreenElement) {
+                    requestFullscreen();
+                }
+            }, true);
+
+            // ============================================================
+            // 6. ОСНОВНАЯ ЛОГИКА
+            // ============================================================
             function renderLockScreen() {
                 const isBlocked = state.blockUntil > 0 && Date.now() < state.blockUntil;
                 const remainingAttempts = Math.max(0, MAX_ATTEMPTS - state.attempts);
@@ -245,10 +331,10 @@
                     const seconds = Math.floor((remaining % 60000) / 1000);
                     const timeStr = `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
                     html += `
-                        <div class="block-msg">⚠️ ДОСТУП ЗАБЛОКИРОВАН</div>
+                        <div class="block-msg">⛔ ДОСТУП ЗАБЛОКИРОВАН</div>
                         <div class="block-timer" id="blockTimerDisplay">${timeStr}</div>
-                        <div style="color:#888;font-size:13px;margin-top:10px;">Превышено число попыток. Повторите через ${BLOCK_MINUTES} минут.</div>
-                        <div class="input-group" style="margin-top:15px;">
+                        <div style="color:#888;font-size:13px;margin-bottom:15px;">Превышено число попыток. Повторите через ${BLOCK_MINUTES} минут.</div>
+                        <div class="input-group">
                             <input type="password" id="passwordInput" placeholder="Введите пароль" maxlength="20" autocomplete="off" disabled>
                             <button class="btn" id="submitBtn" disabled>РАЗБЛОКИРОВАТЬ</button>
                             <div class="error-msg" id="errorMsg"></div>
@@ -268,7 +354,7 @@
                 lockContent.innerHTML = html;
                 bindEvents();
 
-                // Если заблокирован – запускаем таймер
+                // Таймер обратного отсчёта
                 if (isBlocked) {
                     if (countdownInterval) clearInterval(countdownInterval);
                     countdownInterval = setInterval(() => {
@@ -294,6 +380,7 @@
             function bindEvents() {
                 const input = document.getElementById('passwordInput');
                 const btn = document.getElementById('submitBtn');
+
                 if (input && !input.disabled) {
                     input.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter') {
@@ -305,27 +392,57 @@
                         const err = document.getElementById('errorMsg');
                         if (err) err.classList.remove('show');
                     });
+                    // Автофокус с задержкой
                     setTimeout(() => input.focus(), 100);
                 }
+
                 if (btn && !btn.disabled) {
                     btn.addEventListener('click', handleUnlock);
                 }
 
-                // Блокировка клавиш разработчика
-                document.addEventListener('keydown', function(e) {
-                    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || (e.ctrlKey && e.key === 'U')) {
-                        e.preventDefault();
-                        return false;
-                    }
-                });
-                document.addEventListener('contextmenu', function(e) {
+                // Полная блокировка всех клавиш, кроме ввода в поле (но мы уже перехватываем)
+                document.addEventListener('keydown', blockKeys, true);
+                document.addEventListener('contextmenu', blockContext, true);
+                // Блокировка жестов (touchmove) на оверлее
+                overlay.addEventListener('touchmove', function(e) {
                     e.preventDefault();
+                }, { passive: false });
+                overlay.addEventListener('wheel', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
+            }
+
+            function blockKeys(e) {
+                // Запрещаем все системные клавиши и комбинации
+                const key = e.key;
+                if (key === 'F12' ||
+                    (e.ctrlKey && e.shiftKey && (key === 'I' || key === 'J' || key === 'C')) ||
+                    (e.ctrlKey && key === 'U') ||
+                    (e.ctrlKey && key === 'S') ||
+                    (e.ctrlKey && key === 'P') ||
+                    (e.metaKey && (key === 'I' || key === 'J' || key === 'C' || key === 'U'))) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     return false;
-                });
+                }
+                // Разрешаем только ввод в поле (но это обрабатывается отдельно)
+                // Если фокус не на поле ввода, блокируем всё, кроме Escape (для выхода из fullscreen не дадим)
+                const input = document.getElementById('passwordInput');
+                if (document.activeElement !== input && !unlocked) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+
+            function blockContext(e) {
+                e.preventDefault();
+                return false;
             }
 
             function handleUnlock() {
                 if (unlocked) return;
+
                 // Проверка блокировки
                 if (state.blockUntil > 0 && Date.now() < state.blockUntil) {
                     return;
@@ -348,7 +465,6 @@
                 btn.disabled = true;
                 btn.textContent = 'ПРОВЕРКА...';
 
-                // Сравнение с фиксированным паролем
                 const isValid = (entered === FIXED_PASSWORD);
 
                 btn.disabled = false;
@@ -364,12 +480,15 @@
                     if (countdownInterval) clearInterval(countdownInterval);
                     if (guardianInterval) clearInterval(guardianInterval);
                     document.body.classList.remove('alert-bg');
+                    // Убираем блокировку клавиш после разблокировки
+                    document.removeEventListener('keydown', blockKeys, true);
+                    document.removeEventListener('contextmenu', blockContext, true);
+                    // Можно оставить fullscreen, но не обязательно
                 } else {
                     // Неверный пароль
                     state.attempts = (state.attempts || 0) + 1;
                     const remaining = MAX_ATTEMPTS - state.attempts;
                     if (remaining <= 0) {
-                        // Блокировка
                         state.blockUntil = Date.now() + BLOCK_MS;
                         saveState(state);
                         triggerAlarm();
@@ -395,16 +514,13 @@
             }
 
             function shakeBox() {
-                const box = document.getElementById('lockBox');
-                if (box) {
-                    box.classList.add('shake');
-                    setTimeout(() => box.classList.remove('shake'), 400);
-                }
+                lockBox.classList.add('shake');
+                setTimeout(() => lockBox.classList.remove('shake'), 400);
             }
 
             function triggerAlarm() {
                 document.body.classList.add('alert-bg');
-                // Звук (опционально)
+                // Звук
                 try {
                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                     const osc = audioCtx.createOscillator();
@@ -432,7 +548,7 @@
             }
 
             // ============================================================
-            // 5. ЗАЩИТНЫЙ ДЕМОН
+            // 7. ЗАЩИТНЫЙ ДЕМОН (восстановление оверлея)
             // ============================================================
             function startGuardian() {
                 if (guardianInterval) clearInterval(guardianInterval);
@@ -442,32 +558,50 @@
                         guardianInterval = null;
                         return;
                     }
+                    // Проверяем наличие оверлея и его видимость
                     const overlayEl = document.getElementById('lockOverlay');
                     if (!overlayEl || overlayEl.classList.contains('hidden')) {
-                        // Восстановление
+                        // Попытка удалить или скрыть оверлей — перезагрузка
                         location.reload();
                         return;
                     }
+                    // Проверяем содержимое
                     if (!lockContent.innerHTML.trim()) {
                         renderLockScreen();
                     }
-                }, 500);
+                    // Проверяем fullscreen
+                    if (!document.fullscreenElement && !unlocked) {
+                        requestFullscreen();
+                    }
+                }, 300);
             }
 
             // ============================================================
-            // 6. ИНИЦИАЛИЗАЦИЯ
+            // 8. ИНИЦИАЛИЗАЦИЯ
             // ============================================================
             function init() {
+                // Запрашиваем fullscreen сразу
+                requestFullscreen();
+
                 if (state.unlocked) {
                     unlocked = true;
                     overlay.classList.add('hidden');
                     unlockedDiv.classList.add('visible');
                     return;
                 }
+
                 overlay.classList.remove('hidden');
                 unlockedDiv.classList.remove('visible');
                 renderLockScreen();
                 startGuardian();
+
+                // Дополнительно: при любом клике вне поля ввода — фокус на него
+                overlay.addEventListener('click', function(e) {
+                    const input = document.getElementById('passwordInput');
+                    if (input && !input.disabled && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                        input.focus();
+                    }
+                });
             }
 
             init();
